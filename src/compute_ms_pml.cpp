@@ -239,7 +239,8 @@ protected:
             auto c = pattern[m - i - 1];
 
             if (this->bwt.number_of_letter(c) == 0){length = 0;}
-            else if (pos < this->bwt.size() && this->bwt[pos] == c) {length++;}
+            else if (pos < this->bwt.size() && 
+					(this->bwt[pos] - c <= 3 || this->bwt[pos] - c >= -3)) {length++;}
             else {
                 // Get threshold
                 ri::ulint rnk = this->bwt.rank(pos, c);
