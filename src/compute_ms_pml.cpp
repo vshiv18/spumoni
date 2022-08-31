@@ -24,6 +24,7 @@
 #include <ks_test.hpp>
 #include <omp.h>
 #include <batch_loader.hpp>
+#include <cstdlib>
 
 /*
  * This first section of the code contains classes that define pml_pointers
@@ -242,33 +243,46 @@ protected:
             else if (pos < this->bwt.size() && 
 					(this->bwt[pos] - c <= 3 || this->bwt[pos] - c >= -3)) {length++;}
             else {
-                // Get threshold
-                ri::ulint rnk = this->bwt.rank(pos, c);
-                size_t thr = this->bwt.size() + 1;
-
                 ulint next_pos = pos;
+                ulint cand_pos = pos;
+                auto alt_c = c;
+                auto max_pos_diff = this->bwt.size();
+                length = 0;
 
-                // if (rnk < (this->F[c] - this->F[c-1]) // I can use F to compute it
-                if (rnk < this->bwt.number_of_letter(c)) {
+                // try each possible character to find closest match
+                for (size_t alt = c - 3; alt <= c + 3; alt++) {
+                    if (this->bwt.number_of_letter(alt) == 0) {continue;}
 
-                    // j is the first position of the next run of c's
-                    ri::ulint j = this->bwt.select(rnk, c);
-                    ri::ulint run_of_j = this->bwt.run_of_position(j);
+                    // Get threshold
+                    ri::ulint rnk = this->bwt.rank(pos, alt);
+                    size_t thr = this->bwt.size() + 1;
 
-                    thr = thresholds[run_of_j]; // If it is the first run thr = 0
-                    length = 0;
-                    next_pos = j;
+                    if (rnk < this->bwt.number_of_letter(alt)) {
+                        // j is the first position of the next run of c's
+                        ri::ulint j = this->bwt.select(rnk, alt);
+                        ri::ulint run_of_j = this->bwt.run_of_position(j);
+
+                        thr = thresholds[run_of_j]; // If it is the first run thr = 0
+                        cand_pos = j;
+                    }
+
+                    if (pos < thr) {
+                        rnk--;
+                        ri::ulint j = this->bwt.select(rnk, alt);
+                        ri::ulint run_of_j = this->bwt.run_of_position(j);
+                        cand_pos = j;
+                    }
+                    
+                    if (abs((int)cand_pos - (int)pos) < max_pos_diff){
+                        next_pos = cand_pos;
+                        max_pos_diff = abs((int)cand_pos - (int)pos);
+                        alt_c = alt;
+                    }
+
                 }
-
-                if (pos < thr) {
-                    rnk--;
-                    ri::ulint j = this->bwt.select(rnk, c);
-                    ri::ulint run_of_j = this->bwt.run_of_position(j);
-
-                    length = 0;
-                    next_pos = j;
-                }
+                
                 pos = next_pos;
+                c = alt_c;
             }
 
             lengths[m - i - 1] = length;
