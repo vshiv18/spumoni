@@ -241,7 +241,11 @@ protected:
 
             if (this->bwt.number_of_letter(c) == 0){length = 0;}
             else if (pos < this->bwt.size() && 
-					(this->bwt[pos] - c <= 3 || this->bwt[pos] - c >= -3)) {length++;}
+					(this->bwt[pos] - c <= 3 && this->bwt[pos] - c >= -3)) {
+                        // cout << unsigned(c) << ' ' << unsigned(this->bwt[pos]) << '\n';
+                        // cout << unsigned(c);
+                        // cout << unsigned(this->bwt[pos]);
+                        length++;}
             else {
                 ulint next_pos = pos;
                 ulint cand_pos = pos;
