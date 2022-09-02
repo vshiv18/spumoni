@@ -583,7 +583,8 @@ protected:
             auto c = pattern[m - i - 1];
 
             if (this->bwt.number_of_letter(c) == 0){sample = 0;}
-            else if (pos < this->bwt.size() && this->bwt[pos] == c){sample--;}
+            else if (pos < this->bwt.size() && 
+					(this->bwt[pos] - c <= 3 && this->bwt[pos] - c >= -3)) {sample--;}
             else {
                 // Get threshold
                 ri::ulint rnk = this->bwt.rank(pos, c);
@@ -805,7 +806,8 @@ public:
 
         for (size_t i = 0; i < pointers.size(); ++i) {
             size_t pos = pointers[i];
-            while ((i + l) < read_length && (pos + l) < n && (i < 1 || pos != (pointers[i-1] + 1) ) && read[i + l] == ra.charAt(pos + l))
+            while ((i + l) < read_length && (pos + l) < n && (i < 1 || pos != (pointers[i-1] + 1) ) && 
+                        (read[i + l] - ra.charAt(pos + l) <= 3) && (read[i + l] - ra.charAt(pos + l)) >= -3)
                 ++l;
             lengths[i] = l;
             l = (l == 0 ? 0 : (l - 1));
