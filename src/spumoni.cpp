@@ -145,6 +145,7 @@ void parse_run_options(int argc, char** argv, SpumoniRunOptions* opts) {
                     case 'g': opts->is_general_text = true; break;
                     case 't': opts->threads = std::max(std::atoi(optarg), 1); break;
                     case 'd': opts->use_doc = true; break;
+                    // case 's': softness = std::atoi(optarg);
                     default: spumoni_run_usage(); std::exit(1);
         }
     }

@@ -577,14 +577,14 @@ protected:
         ms_pointers.resize(m);
         auto pos = this->bwt_size() - 1;
         auto sample = this->get_last_run_sample();
-
+        size_t softness = 3;
         for (size_t i = 0; i < m; ++i) 
         {
             auto c = pattern[m - i - 1];
 
             if (this->bwt.number_of_letter(c) == 0){sample = 0;}
             else if (pos < this->bwt.size() && 
-					(this->bwt[pos] - c <= 3 && this->bwt[pos] - c >= -3)) {sample--;}
+					(this->bwt[pos] - c <= softness && this->bwt[pos] - c >= (-1 * softness))) {sample--;}
             else {
                 ulint next_pos = pos;
                 ulint cand_pos = pos;
@@ -593,7 +593,7 @@ protected:
                 auto cand_sample = sample;
 
                 // try each possible character to find closest match
-                for (size_t alt = c - 3; alt <= c + 3; alt++) {
+                for (size_t alt = c - softness; alt <= c + softness; alt++) {
                     if (this->bwt.number_of_letter(alt) == 0) {continue;}
 
                     // Get threshold
@@ -814,11 +814,11 @@ public:
         ms.query(read, read_length, pointers);
         lengths.resize(read_length);
         size_t l = 0;
-
+        size_t softness = 3;
         for (size_t i = 0; i < pointers.size(); ++i) {
             size_t pos = pointers[i];
             while ((i + l) < read_length && (pos + l) < n && (i < 1 || pos != (pointers[i-1] + 1) ) && 
-                        (read[i + l] - ra.charAt(pos + l) <= 3) && (read[i + l] - ra.charAt(pos + l)) >= -3)
+                        (read[i + l] - ra.charAt(pos + l) <= softness) && (read[i + l] - ra.charAt(pos + l)) >= (-1 * softness))
                 ++l;
             lengths[i] = l;
             l = (l == 0 ? 0 : (l - 1));
