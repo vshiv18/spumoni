@@ -581,11 +581,13 @@ protected:
         for (size_t i = 0; i < m; ++i) 
         {
             auto c = pattern[m - i - 1];
-
+            
+            uint8_t diff = (this->bwt[pos] > c) ? this->bwt[pos] - c : c - this->bwt[pos];
+            // cout << (int)c << "\t" << (int)diff <<"\n";
             if (this->bwt.number_of_letter(c) == 0){sample = 0;}
-            else if (pos < this->bwt.size() && 
-					(this->bwt[pos] - c <= softness && this->bwt[pos] - c >= (-1 * softness))) {sample--;}
+            else if (pos < this->bwt.size() && (diff <= softness)) {sample--;}
             else {
+                // cout << "case 2" << "\n";
                 ulint next_pos = pos;
                 ulint cand_pos = pos;
                 auto alt_c = c;
@@ -617,10 +619,10 @@ protected:
                         cand_sample = this->samples_last[run_of_j];
                         cand_pos = j;
                     }
-                    
-                    if (abs((int)cand_pos - (int)pos) < max_pos_diff){
+                    size_t dist = (cand_pos > pos) ? cand_pos - pos : pos - cand_pos;
+                    if (dist < max_pos_diff){
                         next_pos = cand_pos;
-                        max_pos_diff = abs((int)cand_pos - (int)pos);
+                        max_pos_diff = dist;
                         alt_c = alt;
                         sample = cand_sample;
                     }
@@ -629,6 +631,7 @@ protected:
                 
                 pos = next_pos;
                 c = alt_c;
+                
             }
 
             ms_pointers[m - i - 1] = sample;
@@ -817,9 +820,13 @@ public:
         size_t softness = 3;
         for (size_t i = 0; i < pointers.size(); ++i) {
             size_t pos = pointers[i];
-            while ((i + l) < read_length && (pos + l) < n && (i < 1 || pos != (pointers[i-1] + 1) ) && 
-                        (read[i + l] - ra.charAt(pos + l) <= softness) && (read[i + l] - ra.charAt(pos + l)) >= (-1 * softness))
+            // diff = (read[i + l] > ra.charAt(pos + l)) ? read[i + l] - ra.charAt(pos + l) : ra.charAt(pos + l) - read[i + l];
+            // std::cout << "loop 2\t" << l << "\n";
+            // (read[i + l] - ra.charAt(pos + l) <= softness) && (read[i + l] - ra.charAt(pos + l)) >= (-1 * softness);
+            while ((i + l) < read_length && (pos + l) < n && (i < 1 || pos != (pointers[i-1] + 1) ) &&
+                ((read[i + l] > ra.charAt(pos + l)) ? read[i + l] - ra.charAt(pos + l) : ra.charAt(pos + l) - read[i + l]) <= softness)
                 ++l;
+                // cout << l << "\t" << (int)diff << "\n";
             lengths[i] = l;
             l = (l == 0 ? 0 : (l - 1));
         }
