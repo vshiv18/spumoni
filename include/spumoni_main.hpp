@@ -218,6 +218,8 @@ public:
   }
 };
 
+// size_t softness = 3; // flexibility in bin difference for case1/2 decision
+
 struct SpumoniRunOptions {
   std::string ref_file = ""; // reference file
   std::string pattern_file = ""; // pattern file
@@ -235,7 +237,6 @@ struct SpumoniRunOptions {
   size_t k = 4; // small window size for minimizers
   size_t w = 11; // large window size for minimizers
   size_t bin_size = 150; // size of region used for KS-test for classification
-
 public:
   void populate_types() {
       /* Populates the output type member of the struct */

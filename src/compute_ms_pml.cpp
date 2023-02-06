@@ -24,6 +24,7 @@
 #include <ks_test.hpp>
 #include <omp.h>
 #include <batch_loader.hpp>
+#include <cstdlib>
 
 /*
  * This first section of the code contains classes that define pml_pointers
@@ -239,35 +240,53 @@ protected:
             auto c = pattern[m - i - 1];
 
             if (this->bwt.number_of_letter(c) == 0){length = 0;}
-            else if (pos < this->bwt.size() && this->bwt[pos] == c) {length++;}
+            else if (pos < this->bwt.size() && 
+					(this->bwt[pos] - c <= 3 && this->bwt[pos] - c >= -3)) {
+                        // cout << unsigned(c) << ' ' << unsigned(this->bwt[pos]) << '\n';
+                        // cout << unsigned(c);
+                        // cout << unsigned(this->bwt[pos]);
+                        length++;}
             else {
-                // Get threshold
-                ri::ulint rnk = this->bwt.rank(pos, c);
-                size_t thr = this->bwt.size() + 1;
-
                 ulint next_pos = pos;
+                ulint cand_pos = pos;
+                auto alt_c = c;
+                auto max_pos_diff = this->bwt.size();
+                length = 0;
 
-                // if (rnk < (this->F[c] - this->F[c-1]) // I can use F to compute it
-                if (rnk < this->bwt.number_of_letter(c)) {
+                // try each possible character to find closest match
+                for (size_t alt = c - 3; alt <= c + 3; alt++) {
+                    if (this->bwt.number_of_letter(alt) == 0) {continue;}
 
-                    // j is the first position of the next run of c's
-                    ri::ulint j = this->bwt.select(rnk, c);
-                    ri::ulint run_of_j = this->bwt.run_of_position(j);
+                    // Get threshold
+                    ri::ulint rnk = this->bwt.rank(pos, alt);
+                    size_t thr = this->bwt.size() + 1;
 
-                    thr = thresholds[run_of_j]; // If it is the first run thr = 0
-                    length = 0;
-                    next_pos = j;
+                    if (rnk < this->bwt.number_of_letter(alt)) {
+                        // j is the first position of the next run of c's
+                        ri::ulint j = this->bwt.select(rnk, alt);
+                        ri::ulint run_of_j = this->bwt.run_of_position(j);
+
+                        thr = thresholds[run_of_j]; // If it is the first run thr = 0
+                        cand_pos = j;
+                    }
+
+                    if (pos < thr) {
+                        rnk--;
+                        ri::ulint j = this->bwt.select(rnk, alt);
+                        ri::ulint run_of_j = this->bwt.run_of_position(j);
+                        cand_pos = j;
+                    }
+                    
+                    if (abs((int)cand_pos - (int)pos) < max_pos_diff){
+                        next_pos = cand_pos;
+                        max_pos_diff = abs((int)cand_pos - (int)pos);
+                        alt_c = alt;
+                    }
+
                 }
-
-                if (pos < thr) {
-                    rnk--;
-                    ri::ulint j = this->bwt.select(rnk, c);
-                    ri::ulint run_of_j = this->bwt.run_of_position(j);
-
-                    length = 0;
-                    next_pos = j;
-                }
+                
                 pos = next_pos;
+                c = alt_c;
             }
 
             lengths[m - i - 1] = length;
@@ -558,46 +577,61 @@ protected:
         ms_pointers.resize(m);
         auto pos = this->bwt_size() - 1;
         auto sample = this->get_last_run_sample();
-
+        size_t softness = 3;
         for (size_t i = 0; i < m; ++i) 
         {
             auto c = pattern[m - i - 1];
-
+            
+            uint8_t diff = (this->bwt[pos] > c) ? this->bwt[pos] - c : c - this->bwt[pos];
+            // cout << (int)c << "\t" << (int)diff <<"\n";
             if (this->bwt.number_of_letter(c) == 0){sample = 0;}
-            else if (pos < this->bwt.size() && this->bwt[pos] == c){sample--;}
+            else if (pos < this->bwt.size() && (diff <= softness)) {sample--;}
             else {
-                // Get threshold
-                ri::ulint rnk = this->bwt.rank(pos, c);
-                size_t thr = this->bwt.size() + 1;
-
+                // cout << "case 2" << "\n";
                 ulint next_pos = pos;
+                ulint cand_pos = pos;
+                auto alt_c = c;
+                auto max_pos_diff = this->bwt.size();
+                auto cand_sample = sample;
 
-                // if (rnk < (this->F[c] - this->F[c-1]) // I can use F to compute it
-                if (rnk < this->bwt.number_of_letter(c)) {
+                // try each possible character to find closest match
+                for (size_t alt = c - softness; alt <= c + softness; alt++) {
+                    if (this->bwt.number_of_letter(alt) == 0) {continue;}
 
-                    // j is the first position of the next run of c's
-                    ri::ulint j = this->bwt.select(rnk, c);
-                    ri::ulint run_of_j = this->bwt.run_of_position(j);
+                    // Get threshold
+                    ri::ulint rnk = this->bwt.rank(pos, alt);
+                    size_t thr = this->bwt.size() + 1;
 
-                    thr = thresholds[run_of_j]; // If it is the first run thr = 0
+                    if (rnk < this->bwt.number_of_letter(alt)) {
+                        // j is the first position of the next run of c's
+                        ri::ulint j = this->bwt.select(rnk, alt);
+                        ri::ulint run_of_j = this->bwt.run_of_position(j);
 
-                    // Here we should use Phi_inv that is not implemented yet
-                    // sample = this->Phi(this->samples_last[run_of_j - 1]) - 1;
-                    sample = samples_start[run_of_j];
+                        thr = thresholds[run_of_j]; // If it is the first run thr = 0
+                        cand_sample = samples_start[run_of_j];
+                        cand_pos = j;
+                    }
 
-                    next_pos = j;
+                    if (pos < thr) {
+                        rnk--;
+                        ri::ulint j = this->bwt.select(rnk, alt);
+                        ri::ulint run_of_j = this->bwt.run_of_position(j);
+                        cand_sample = this->samples_last[run_of_j];
+                        cand_pos = j;
+                    }
+                    size_t dist = (cand_pos > pos) ? cand_pos - pos : pos - cand_pos;
+                    if (dist < max_pos_diff){
+                        next_pos = cand_pos;
+                        max_pos_diff = dist;
+                        alt_c = alt;
+                        sample = cand_sample;
+                    }
+
                 }
-
-                if (pos < thr) {
-                    rnk--;
-                    ri::ulint j = this->bwt.select(rnk, c);
-                    ri::ulint run_of_j = this->bwt.run_of_position(j);
-
-                    sample = this->samples_last[run_of_j];
-                    next_pos = j;
-                }
-
+                
                 pos = next_pos;
+                c = alt_c;
+                
             }
 
             ms_pointers[m - i - 1] = sample;
@@ -783,11 +817,16 @@ public:
         ms.query(read, read_length, pointers);
         lengths.resize(read_length);
         size_t l = 0;
-
+        size_t softness = 3;
         for (size_t i = 0; i < pointers.size(); ++i) {
             size_t pos = pointers[i];
-            while ((i + l) < read_length && (pos + l) < n && (i < 1 || pos != (pointers[i-1] + 1) ) && read[i + l] == ra.charAt(pos + l))
+            // diff = (read[i + l] > ra.charAt(pos + l)) ? read[i + l] - ra.charAt(pos + l) : ra.charAt(pos + l) - read[i + l];
+            // std::cout << "loop 2\t" << l << "\n";
+            // (read[i + l] - ra.charAt(pos + l) <= softness) && (read[i + l] - ra.charAt(pos + l)) >= (-1 * softness);
+            while ((i + l) < read_length && (pos + l) < n && (i < 1 || pos != (pointers[i-1] + 1) ) &&
+                ((read[i + l] > ra.charAt(pos + l)) ? read[i + l] - ra.charAt(pos + l) : ra.charAt(pos + l) - read[i + l]) <= softness)
                 ++l;
+                // cout << l << "\t" << (int)diff << "\n";
             lengths[i] = l;
             l = (l == 0 ? 0 : (l - 1));
         }
