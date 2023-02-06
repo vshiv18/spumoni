@@ -235,17 +235,15 @@ protected:
         // Start with the empty string
         auto pos = this->bwt_size() - 1;
         auto length = 0;
+        size_t softness = 3;
 
         for (size_t i = 0; i < m; ++i) {
             auto c = pattern[m - i - 1];
 
+            uint8_t diff = (this->bwt[pos] > c) ? this->bwt[pos] - c : c - this->bwt[pos];
+            // cout << (int)c << "\t" << (int)diff <<"\n";
             if (this->bwt.number_of_letter(c) == 0){length = 0;}
-            else if (pos < this->bwt.size() && 
-					(this->bwt[pos] - c <= 3 && this->bwt[pos] - c >= -3)) {
-                        // cout << unsigned(c) << ' ' << unsigned(this->bwt[pos]) << '\n';
-                        // cout << unsigned(c);
-                        // cout << unsigned(this->bwt[pos]);
-                        length++;}
+            else if (pos < this->bwt.size() && (diff <= softness)) {length++;}
             else {
                 ulint next_pos = pos;
                 ulint cand_pos = pos;
@@ -254,7 +252,7 @@ protected:
                 length = 0;
 
                 // try each possible character to find closest match
-                for (size_t alt = c - 3; alt <= c + 3; alt++) {
+                for (size_t alt = c - softness; alt <= c + softness; alt++) {
                     if (this->bwt.number_of_letter(alt) == 0) {continue;}
 
                     // Get threshold
@@ -306,41 +304,59 @@ protected:
         // Start with the empty string
         auto pos = this->bwt_size() - 1;
         auto length = 0;
+        size_t softness = 3;
         size_t curr_doc_id = doc_arr.end_runs_doc[this->bwt.number_of_runs()-1];
 
         for (size_t i = 0; i < m; ++i) {
             auto c = pattern[m - i - 1];
 
+            uint8_t diff = (this->bwt[pos] > c) ? this->bwt[pos] - c : c - this->bwt[pos];
             if (this->bwt.number_of_letter(c) == 0){length = 0;}
-            else if (pos < this->bwt.size() && this->bwt[pos] == c) {length++;}
+            else if (pos < this->bwt.size() && (diff <= softness)) {length++;}
             else {
-                // Get threshold
-                ri::ulint rnk = this->bwt.rank(pos, c);
-                size_t thr = this->bwt.size() + 1;
+
                 ulint next_pos = pos;
+                ulint cand_pos = pos;
+                auto alt_c = c;
+                auto max_pos_diff = this->bwt.size();
+                auto cand_doc = curr_doc_id;
+                length = 0;
 
-                if (rnk < this->bwt.number_of_letter(c)) {
-                    // j is the first position of the next run of c's
-                    ri::ulint j = this->bwt.select(rnk, c);
-                    ri::ulint run_of_j = this->bwt.run_of_position(j);
+                for (size_t alt = c - softness; alt <= c + softness; alt++) {
+                    if (this->bwt.number_of_letter(alt) == 0) {continue;}
+                    
+                    // Get threshold
+                    ri::ulint rnk = this->bwt.rank(pos, alt);
+                    size_t thr = this->bwt.size() + 1;
 
-                    thr = thresholds[run_of_j]; // If it is the first run thr = 0
-                    curr_doc_id = doc_arr.start_runs_doc[run_of_j];
+                    if (rnk < this->bwt.number_of_letter(alt)) {
+                        // j is the first position of the next run of c's
+                        ri::ulint j = this->bwt.select(rnk, alt);
+                        ri::ulint run_of_j = this->bwt.run_of_position(j);
 
-                    length = 0;
-                    next_pos = j;
-                }
+                        thr = thresholds[run_of_j]; // If it is the first run thr = 0
+                        cand_doc = doc_arr.start_runs_doc[run_of_j];
+                        
+                        cand_pos = j;
+                    }
 
-                if (pos < thr) {
-                    rnk--;
-                    ri::ulint j = this->bwt.select(rnk, c);
-                    ri::ulint run_of_j = this->bwt.run_of_position(j);
-                    curr_doc_id = doc_arr.end_runs_doc[run_of_j];
+                    if (pos < thr) {
+                        rnk--;
+                        ri::ulint j = this->bwt.select(rnk, alt);
+                        ri::ulint run_of_j = this->bwt.run_of_position(j);
+                        cand_doc = doc_arr.end_runs_doc[run_of_j];
 
-                    length = 0;
-                    next_pos = j;
+                        cand_pos = j;
+                    }
+                    if (abs((int)cand_pos - (int)pos) < max_pos_diff){
+                        next_pos = cand_pos;
+                        max_pos_diff = abs((int)cand_pos - (int)pos);
+                        alt_c = alt;
+                        curr_doc_id = cand_doc;
+                    }
                 }
                 pos = next_pos;
+                c = alt_c;
             }
 
             lengths[m-i-1] = length;
@@ -651,47 +667,65 @@ protected:
         auto pos = this->bwt_size() - 1;
         auto sample = this->get_last_run_sample();
         size_t curr_doc_id = doc_arr.end_runs_doc[this->bwt.number_of_runs()-1];
-
+        size_t softness = 3;
         for (size_t i = 0; i < m; ++i) 
         {
             auto c = pattern[m - i - 1];
+
+            uint8_t diff = (this->bwt[pos] > c) ? this->bwt[pos] - c : c - this->bwt[pos];
             if (this->bwt.number_of_letter(c) == 0){
                 sample = 0;
                 ri::ulint run_of_j = this->bwt.run_of_position(sample);
                 curr_doc_id = doc_arr.start_runs_doc[run_of_j];
             }
-            else if (pos < this->bwt.size() && this->bwt[pos] == c){sample--;}
+            else if (pos < this->bwt.size() && (diff <= softness)) {sample--;}
             else {
-                // Get threshold
-                ri::ulint rnk = this->bwt.rank(pos, c);
-                size_t thr = this->bwt.size() + 1;
+                
                 ulint next_pos = pos;
+                ulint cand_pos = pos;
+                auto alt_c = c;
+                auto max_pos_diff = this->bwt.size();
+                auto cand_sample = sample;
+                auto cand_doc = curr_doc_id;
+                
+                for (size_t alt = c - softness; alt <= c + softness; alt++) {
+                    if (this->bwt.number_of_letter(alt) == 0) {continue;}
+                    // Get threshold
+                    ri::ulint rnk = this->bwt.rank(pos, alt);
+                    size_t thr = this->bwt.size() + 1;
+                    if (rnk < this->bwt.number_of_letter(alt)) {
+                        // j is the first position of the next run of c's
+                        ri::ulint j = this->bwt.select(rnk, alt);
+                        ri::ulint run_of_j = this->bwt.run_of_position(j);
 
-                if (rnk < this->bwt.number_of_letter(c)) {
-                    // j is the first position of the next run of c's
-                    ri::ulint j = this->bwt.select(rnk, c);
-                    ri::ulint run_of_j = this->bwt.run_of_position(j);
+                        thr = thresholds[run_of_j]; // If it is the first run thr = 0
+                        cand_sample = samples_start[run_of_j];
+                        cand_doc = doc_arr.start_runs_doc[run_of_j];
 
-                    thr = thresholds[run_of_j]; // If it is the first run thr = 0
-                    sample = samples_start[run_of_j];
-                    curr_doc_id = doc_arr.start_runs_doc[run_of_j];
+                        cand_pos = j;
+                    }
 
-                    next_pos = j;
+                    if (pos < thr) {
+                        rnk--;
+                        ri::ulint j = this->bwt.select(rnk, alt);
+                        ri::ulint run_of_j = this->bwt.run_of_position(j);
+
+                        cand_sample = this->samples_last[run_of_j];
+                        cand_doc = doc_arr.end_runs_doc[run_of_j];
+                        cand_pos = j;
+                    }
+                    size_t dist = (cand_pos > pos) ? cand_pos - pos : pos - cand_pos;
+                    if (dist < max_pos_diff){
+                        next_pos = cand_pos;
+                        max_pos_diff = dist;
+                        alt_c = alt;
+                        sample = cand_sample;
+                        curr_doc_id = cand_doc;
+                    }
                 }
-
-                if (pos < thr) {
-                    rnk--;
-                    ri::ulint j = this->bwt.select(rnk, c);
-                    ri::ulint run_of_j = this->bwt.run_of_position(j);
-
-                    sample = this->samples_last[run_of_j];
-                    curr_doc_id = doc_arr.end_runs_doc[run_of_j];
-                    next_pos = j;
-                }
-
                 pos = next_pos;
+                c = alt_c;
             }
-
             ms_pointers[m-i-1] = sample;
             doc_nums[m-i-1] = curr_doc_id;
             
@@ -825,7 +859,7 @@ public:
             // (read[i + l] - ra.charAt(pos + l) <= softness) && (read[i + l] - ra.charAt(pos + l)) >= (-1 * softness);
             while ((i + l) < read_length && (pos + l) < n && (i < 1 || pos != (pointers[i-1] + 1) ) &&
                 ((read[i + l] > ra.charAt(pos + l)) ? read[i + l] - ra.charAt(pos + l) : ra.charAt(pos + l) - read[i + l]) <= softness)
-                ++l;
+                    ++l;
                 // cout << l << "\t" << (int)diff << "\n";
             lengths[i] = l;
             l = (l == 0 ? 0 : (l - 1));
@@ -839,9 +873,11 @@ public:
         ms.query(read, read_length, pointers, doc_nums, doc_arr);
         lengths.resize(read_length);
         size_t l = 0;
+        size_t softness = 3;
         for (size_t i = 0; i < pointers.size(); ++i) {
             size_t pos = pointers[i];
-            while ((i + l) < read_length && (pos + l) < n && (i < 1 || pos != (pointers[i-1] + 1) ) && read[i + l] == ra.charAt(pos + l))
+            while ((i + l) < read_length && (pos + l) < n && (i < 1 || pos != (pointers[i-1] + 1) ) &&
+            ((read[i + l] > ra.charAt(pos + l)) ? read[i + l] - ra.charAt(pos + l) : ra.charAt(pos + l) - read[i + l]) <= softness)
                 ++l;
             lengths[i] = l;
             l = (l == 0 ? 0 : (l - 1));
